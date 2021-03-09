@@ -20,14 +20,14 @@
     metric:
       # metric returned will be interval*rate
       type: counter
-      rate: 2    
+      rate: 2.0
 - provider: prometheus
   uri: /prom
   params:
   - name: query
     value: something
   headers:
-  - user: abcd
+    user: abcd
     pass: efgh
   metric:
     # metric returned will be shift + Beta(interval * alpha, interval * beta) * multiplier
