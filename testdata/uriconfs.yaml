@@ -1,4 +1,4 @@
-- provider: prometheus # this URI will generate metrics in Prometheus response format
+- provider: Prometheus # this URI will generate metrics in Prometheus response format
   uri: /prom
   # every query to this URI needs to have the following headers
   headers:
@@ -21,18 +21,18 @@
       # metric returned will be interval*rate
       type: counter
       rate: 2.0
-- provider: prometheus
-  uri: /newrelic
-  params:
-  - name: query
-    value: something
-  headers:
-    user: abcd
-    pass: efgh
-  metric:
-    # metric returned will be shift + Beta(interval * alpha, interval * beta) * multiplier
-    type: gauge
-    shift: 10.0
-    multiplier: 3.0
-    alpha: 0.1
-    beta: 0.1
+# - provider: "New Relic"
+#   uri: /newrelic
+#   params:
+#   - name: query
+#     value: something
+#   headers:
+#     user: abcd
+#     pass: efgh
+#   metric:
+#     # metric returned will be shift + Beta(interval * alpha, interval * beta) * multiplier
+#     type: gauge
+#     shift: 10.0
+#     multiplier: 3.0
+#     alpha: 0.1
+#     beta: 0.1

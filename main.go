@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 
+	log "github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -53,26 +54,27 @@ type PrometheusResponse struct {
 	} `json:"data"`
 }
 
-// func getHandlerFunc(m Matcher, provider string) HandlerFunc {
-// 	switch provider {
-// 	case "Prometheus":
-// 		var f HandlerFunc = func(w http.ResponseWriter, req *http.Request) {
-// 			if m.Match(req) {
-// 				b, _ := json.Marshal(PrometheusResponse{
-// 					Status: "success",
-// 				})
-// 				w.WriteHeader(http.StatusOK)
-// 				w.Write(b)
-// 			} else {
-// 				w.WriteHeader(http.StatusInternalServerError)
-// 				w.Write([]byte("500 - non-matching request!"))
-// 			}
-// 		}
-// 		return f
-// 	default:
-// 		panic("unknown provider: " + provider)
-// 	}
-// }
+func getHandlerFunc(conf URIConf) HandlerFunc {
+	switch conf.Provider {
+	case "Prometheus":
+		// var f HandlerFunc = func(w http.ResponseWriter, req *http.Request) {
+		// 	if m.Match(req) {
+		// 		b, _ := json.Marshal(PrometheusResponse{
+		// 			Status: "success",
+		// 		})
+		// 		w.WriteHeader(http.StatusOK)
+		// 		w.Write(b)
+		// 	} else {
+		// 		w.WriteHeader(http.StatusInternalServerError)
+		// 		w.Write([]byte("500 - non-matching request!"))
+		// 	}
+		// }
+		// return f
+		return hello
+	default:
+		panic("unknown provider: " + conf.Provider)
+	}
+}
 
 // Param is simply a name-value pair representing name and value of HTTP query param
 type Param struct {
@@ -137,14 +139,16 @@ func main() {
 	uriset := make(map[string]struct{})
 	for _, conf := range uriConfs {
 		if _, ok := uriset[conf.URI]; ok {
+			log.Error(uriset)
+			log.Error(conf.URI)
 			panic("URIs are not unique")
 		}
 		uriset[conf.URI] = struct{}{}
 	}
 
-	// for _, conf := range uriConfs {
-	// 	http.HandleFunc(conf.URI, getHandlerFunc(conf.Matcher, conf.Provider))
-	// }
+	for _, conf := range uriConfs {
+		http.HandleFunc(conf.URI, getHandlerFunc(conf))
+	}
 
-	// http.ListenAndServe(":8090", nil)
+	http.ListenAndServe(":8080", nil)
 }
