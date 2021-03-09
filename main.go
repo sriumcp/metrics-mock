@@ -10,23 +10,17 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"time"
 
 	log "github.com/sirupsen/logrus"
+	distuv "gonum.org/v1/gonum/stat/distuv"
 	yaml "gopkg.in/yaml.v2"
 )
 
-func hello(w http.ResponseWriter, req *http.Request) {
+var start time.Time
 
-	fmt.Fprintf(w, "hello\n")
-}
-
-func headers(w http.ResponseWriter, req *http.Request) {
-
-	for name, headers := range req.Header {
-		for _, h := range headers {
-			fmt.Fprintf(w, "%v: %v\n", name, h)
-		}
-	}
+func init() {
+	start = time.Now()
 }
 
 // HandlerFunc type is the type of function used as http request handler
@@ -100,6 +94,18 @@ func getHandlerFunc(conf URIConf) HandlerFunc {
 }
 
 func getValue(version *VersionInfo) float64 {
+	elapsed := time.Now().Sub(start)
+	if version.Metric.Type == "counter" {
+		return elapsed.Seconds() * version.Metric.Rate
+	}
+	if version.Metric.Type == "gauge" {
+		log.Info("metricinfo...", version.Metric)
+		beta := distuv.Beta{
+			Alpha: (elapsed.Seconds() + 1.0) * version.Metric.Alpha,
+			Beta:  (elapsed.Seconds() + 1.0) * version.Metric.Beta,
+		}.Rand()
+		return version.Metric.Shift + beta*version.Metric.Multiplier
+	}
 	return 21.7639
 }
 
@@ -111,12 +117,12 @@ type Param struct {
 
 // MetricInfo provides information about the metric to be generated
 type MetricInfo struct {
-	Type       string   `yaml:"type"`
-	Rate       *float64 `yaml:"rate"`
-	Shift      *float64 `yaml:"shift"`
-	Multiplier *float64 `yaml:"multiplier"`
-	Alpha      *float64 `yaml:"alpha"`
-	Beta       *float64 `yaml:"beta"`
+	Type       string  `yaml:"type"`
+	Rate       float64 `yaml:"rate"`
+	Shift      float64 `yaml:"shift"`
+	Multiplier float64 `yaml:"multiplier"`
+	Alpha      float64 `yaml:"alpha"`
+	Beta       float64 `yaml:"beta"`
 }
 
 // VersionInfo struct provides the param and metric information for a version
@@ -149,20 +155,25 @@ func (u *URIConf) GetVersion(req *http.Request) *VersionInfo {
 		found := true
 		for _, param := range version.Params {
 			val, ok := req.URL.Query()[param.Name]
+			// query has this parameter
 			if ok && len(val[0]) > 0 {
 				matched, err := regexp.Match(param.Value, []byte(val[0]))
-				if err == nil && matched {
-					continue
-				} else {
-					log.Warn("no match...")
+				if err != nil || !matched { // query parameter does not match value
+					log.Warn("found no match for ... " + param.Name)
 					log.Warn(param.Value)
 					log.Warn(val[0])
+					found = false
+					break
+				} else { // query parameter matches value
+					log.Info("found match for ... " + param.Name)
+					log.Info(param.Value)
+					log.Info(val[0])
 				}
+			} else { // query doesn't have this parameter
+				found = false
 			}
-			found = false
-			break
 		}
-		if found {
+		if found { // return the first version found
 			return &version
 		}
 	}
@@ -170,10 +181,6 @@ func (u *URIConf) GetVersion(req *http.Request) *VersionInfo {
 }
 
 func main() {
-
-	http.HandleFunc("/hello", hello)
-	http.HandleFunc("/headers", headers)
-
 	// find config url from env
 	configURL := os.Getenv("CONFIG_URL")
 	if len(configURL) == 0 {
