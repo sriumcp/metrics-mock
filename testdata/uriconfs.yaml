@@ -1,5 +1,5 @@
 - provider: Prometheus # this URI will generate metrics in Prometheus response format
-  uri: /prom
+  uri: /prom # do not use / for the uri; will lead to unexpected bad things; also make sure URIs are unique
   # every query to this URI needs to have the following headers
   headers:
     user: abcd
@@ -8,12 +8,12 @@
   versions:
   - params: # params for version 1 should match the following; 
     - name: query
-      value: something # value will be a regex matched with the `query` param value
+      value: sum(increase(revision_app_request_latencies_count{revision_name='live-revision'}[.*])) or on() vector(0) # value will be a regex matched with the `query` param value
     metric:
       # metric returned for this version will be interval*rate
       # interval = time elapsed in seconds since the metrics-gen pod started
       type: counter
-      rate: 2    
+      rate: 2  
   - params:
     - name: query
       value: something

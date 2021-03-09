@@ -4,10 +4,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
 
 	log "github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
@@ -30,8 +32,8 @@ func headers(w http.ResponseWriter, req *http.Request) {
 // HandlerFunc type is the type of function used as http request handler
 type HandlerFunc func(w http.ResponseWriter, req *http.Request)
 
-// PrometheusResponse struct captures a response from prometheus
 /*
+Example prometheus response
 {
     "status": "success",
     "data": {
@@ -44,36 +46,61 @@ type HandlerFunc func(w http.ResponseWriter, req *http.Request)
     }
 }
 */
+
+// PrometheusResult is the result section of PrometheusResponseData
+type PrometheusResult []struct {
+	Value []interface{} `json:"value"`
+}
+
+// PrometheusResponseData is the data section of Prometheus response
+type PrometheusResponseData struct {
+	ResultType string           `json:"resultType"`
+	Result     PrometheusResult `json:"result"`
+}
+
+// PrometheusResponse struct captures a response from prometheus
 type PrometheusResponse struct {
-	Status string `json:"status"`
-	Data   struct {
-		ResultType string `json:"resultType"`
-		Result     []struct {
-			Value []interface{} `json:"value"`
-		} `json:"result"`
-	} `json:"data"`
+	Status string                 `json:"status"`
+	Data   PrometheusResponseData `json:"data"`
 }
 
 func getHandlerFunc(conf URIConf) HandlerFunc {
 	switch conf.Provider {
 	case "Prometheus":
-		// var f HandlerFunc = func(w http.ResponseWriter, req *http.Request) {
-		// 	if m.Match(req) {
-		// 		b, _ := json.Marshal(PrometheusResponse{
-		// 			Status: "success",
-		// 		})
-		// 		w.WriteHeader(http.StatusOK)
-		// 		w.Write(b)
-		// 	} else {
-		// 		w.WriteHeader(http.StatusInternalServerError)
-		// 		w.Write([]byte("500 - non-matching request!"))
-		// 	}
-		// }
-		// return f
-		return hello
+		var f HandlerFunc = func(w http.ResponseWriter, req *http.Request) {
+			if !conf.MatchHeaders(req) {
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte("headers are not matching"))
+			} else {
+				if version := conf.GetVersion(req); version != nil {
+					b, _ := json.Marshal(PrometheusResponse{
+						Status: "success",
+						Data: PrometheusResponseData{
+							ResultType: "vector",
+							Result: PrometheusResult{
+								{
+									Value: []interface{}{1556823494.744, fmt.Sprint(getValue(version))},
+								},
+							},
+						},
+					})
+					w.WriteHeader(http.StatusOK)
+					w.Write(b)
+					log.Info(version)
+				} else {
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte("500 - cannot find any matching version in request!"))
+				}
+			}
+		}
+		return f
 	default:
 		panic("unknown provider: " + conf.Provider)
 	}
+}
+
+func getValue(version *VersionInfo) float64 {
+	return 21.7639
 }
 
 // Param is simply a name-value pair representing name and value of HTTP query param
@@ -106,6 +133,42 @@ type URIConf struct {
 	Provider string            `yaml:"provider"`
 }
 
+// MatchHeaders ensures that the headers in URIConf match the headers in the request
+func (u *URIConf) MatchHeaders(req *http.Request) bool {
+	for key, val := range u.Headers {
+		if req.Header.Get(key) != val {
+			return false
+		}
+	}
+	return true
+}
+
+// GetVersion finds the correct version in URIConf based on params in the request or returns nil if no matching version is found
+func (u *URIConf) GetVersion(req *http.Request) *VersionInfo {
+	for _, version := range u.Versions {
+		found := true
+		for _, param := range version.Params {
+			val, ok := req.URL.Query()[param.Name]
+			if ok && len(val[0]) > 0 {
+				matched, err := regexp.Match(param.Value, []byte(val[0]))
+				if err == nil && matched {
+					continue
+				} else {
+					log.Warn("no match...")
+					log.Warn(param.Value)
+					log.Warn(val[0])
+				}
+			}
+			found = false
+			break
+		}
+		if found {
+			return &version
+		}
+	}
+	return nil
+}
+
 func main() {
 
 	http.HandleFunc("/hello", hello)
@@ -135,7 +198,7 @@ func main() {
 		panic(err)
 	}
 
-	// check of URIs are unique
+	// check if URIs are unique
 	uriset := make(map[string]struct{})
 	for _, conf := range uriConfs {
 		if _, ok := uriset[conf.URI]; ok {
