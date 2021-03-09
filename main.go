@@ -4,11 +4,12 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+
+	yaml "gopkg.in/yaml.v2"
 )
 
 func hello(w http.ResponseWriter, req *http.Request) {
@@ -75,32 +76,32 @@ type PrometheusResponse struct {
 
 // Param is simply a name-value pair representing name and value of HTTP query param
 type Param struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+	Name  string `yaml:"name"`
+	Value string `yaml:"value"`
 }
 
 // MetricInfo provides information about the metric to be generated
 type MetricInfo struct {
-	Type       string   `json:"type"`
-	Rate       *float64 `json:"rate"`
-	Shift      *float64 `json:"shift"`
-	Multiplier *float64 `json:"multiplier"`
-	Alpha      *float64 `json:"alpha"`
-	Beta       *float64 `json:"beta"`
+	Type       string   `yaml:"type"`
+	Rate       *float64 `yaml:"rate"`
+	Shift      *float64 `yaml:"shift"`
+	Multiplier *float64 `yaml:"multiplier"`
+	Alpha      *float64 `yaml:"alpha"`
+	Beta       *float64 `yaml:"beta"`
 }
 
 // VersionInfo struct provides the param and metric information for a version
 type VersionInfo struct {
-	Params []Param    `json:"params"`
-	Metric MetricInfo `json:"metric"`
+	Params []Param    `yaml:"params"`
+	Metric MetricInfo `yaml:"metric"`
 }
 
 // URIConf is the metrics gen configuration for a URI
 type URIConf struct {
-	Versions []VersionInfo     `json:"versions"`
-	Headers  map[string]string `json:"headers"`
-	URI      string            `json:"uri"`
-	Provider string            `json:"provider"`
+	Versions []VersionInfo     `yaml:"versions"`
+	Headers  map[string]string `yaml:"headers"`
+	URI      string            `yaml:"uri"`
+	Provider string            `yaml:"provider"`
 }
 
 func main() {
@@ -127,7 +128,7 @@ func main() {
 	}
 
 	var uriConfs []URIConf
-	err = json.Unmarshal(body, &uriConfs)
+	err = yaml.Unmarshal(body, &uriConfs)
 	if err != nil {
 		panic(err)
 	}
