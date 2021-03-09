@@ -1,0 +1,38 @@
+- provider: prometheus # this URI will generate metrics in Prometheus response format
+  uri: /prom
+  # every query to this URI needs to have the following headers
+  headers:
+    user: abcd
+    pass: efgh
+  # this URI will generate metrics for the following versions
+  versions:
+  - params: # params for version 1 should match the following; 
+    - name: query
+      value: something # value will be a regex matched with the `query` param value
+    metric:
+      # metric returned for this version will be interval*rate
+      # interval = time elapsed in seconds since the metrics-gen pod started
+      type: counter
+      rate: 2    
+  - params:
+    - name: query
+      value: something
+    metric:
+      # metric returned will be interval*rate
+      type: counter
+      rate: 2    
+- provider: prometheus
+  uri: /prom
+  params:
+  - name: query
+    value: something
+  headers:
+  - user: abcd
+    pass: efgh
+  metric:
+    # metric returned will be shift + Beta(interval * alpha, interval * beta) * multiplier
+    type: gauge
+    shift: 10.0
+    multiplier: 3.0
+    alpha: 0.1
+    beta: 0.1
