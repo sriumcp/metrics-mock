@@ -22,7 +22,7 @@
       type: counter
       rate: 2.0
 - provider: prometheus
-  uri: /prom
+  uri: /newrelic
   params:
   - name: query
     value: something
