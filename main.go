@@ -133,6 +133,15 @@ func main() {
 		panic(err)
 	}
 
+	// check of URIs are unique
+	uriset := make(map[string]struct{})
+	for _, conf := range uriConfs {
+		if _, ok := uriset[conf.URI]; ok {
+			panic("URIs are not unique")
+		}
+		uriset[conf.URI] = struct{}{}
+	}
+
 	// for _, conf := range uriConfs {
 	// 	http.HandleFunc(conf.URI, getHandlerFunc(conf.Matcher, conf.Provider))
 	// }
