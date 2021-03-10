@@ -4,33 +4,30 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
+	"time"
 
+	log "github.com/sirupsen/logrus"
+	distuv "gonum.org/v1/gonum/stat/distuv"
 	yaml "gopkg.in/yaml.v2"
 )
 
-func hello(w http.ResponseWriter, req *http.Request) {
+var start time.Time
 
-	fmt.Fprintf(w, "hello\n")
-}
-
-func headers(w http.ResponseWriter, req *http.Request) {
-
-	for name, headers := range req.Header {
-		for _, h := range headers {
-			fmt.Fprintf(w, "%v: %v\n", name, h)
-		}
-	}
+func init() {
+	start = time.Now()
 }
 
 // HandlerFunc type is the type of function used as http request handler
 type HandlerFunc func(w http.ResponseWriter, req *http.Request)
 
-// PrometheusResponse struct captures a response from prometheus
 /*
+Example prometheus response
 {
     "status": "success",
     "data": {
@@ -43,36 +40,77 @@ type HandlerFunc func(w http.ResponseWriter, req *http.Request)
     }
 }
 */
-type PrometheusResponse struct {
-	Status string `json:"status"`
-	Data   struct {
-		ResultType string `json:"resultType"`
-		Result     []struct {
-			Value []interface{} `json:"value"`
-		} `json:"result"`
-	} `json:"data"`
+
+// PrometheusResult is the result section of PrometheusResponseData
+type PrometheusResult []struct {
+	Value []interface{} `json:"value"`
 }
 
-// func getHandlerFunc(m Matcher, provider string) HandlerFunc {
-// 	switch provider {
-// 	case "Prometheus":
-// 		var f HandlerFunc = func(w http.ResponseWriter, req *http.Request) {
-// 			if m.Match(req) {
-// 				b, _ := json.Marshal(PrometheusResponse{
-// 					Status: "success",
-// 				})
-// 				w.WriteHeader(http.StatusOK)
-// 				w.Write(b)
-// 			} else {
-// 				w.WriteHeader(http.StatusInternalServerError)
-// 				w.Write([]byte("500 - non-matching request!"))
-// 			}
-// 		}
-// 		return f
-// 	default:
-// 		panic("unknown provider: " + provider)
-// 	}
-// }
+// PrometheusResponseData is the data section of Prometheus response
+type PrometheusResponseData struct {
+	ResultType string           `json:"resultType"`
+	Result     PrometheusResult `json:"result"`
+}
+
+// PrometheusResponse struct captures a response from prometheus
+type PrometheusResponse struct {
+	Status string                 `json:"status"`
+	Data   PrometheusResponseData `json:"data"`
+}
+
+func getHandlerFunc(conf URIConf) HandlerFunc {
+	switch conf.Provider {
+	case "Prometheus":
+		var f HandlerFunc = func(w http.ResponseWriter, req *http.Request) {
+			if !conf.MatchHeaders(req) {
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte("headers are not matching"))
+			} else {
+				if version := conf.GetVersion(req); version != nil {
+					b, _ := json.Marshal(PrometheusResponse{
+						Status: "success",
+						Data: PrometheusResponseData{
+							ResultType: "vector",
+							Result: PrometheusResult{
+								{
+									Value: []interface{}{1556823494.744, fmt.Sprint(getValue(version))},
+								},
+							},
+						},
+					})
+					w.WriteHeader(http.StatusOK)
+					w.Write(b)
+					log.Info(version)
+				} else {
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte("500 - cannot find any matching version in request!"))
+				}
+			}
+		}
+		return f
+	default:
+		panic("unknown provider: " + conf.Provider)
+	}
+}
+
+func getValue(version *VersionInfo) float64 {
+	elapsed := time.Now().Sub(start)
+	if version.Metric.Type == "counter" {
+		return elapsed.Seconds() * version.Metric.Rate
+	}
+	if version.Metric.Type == "gauge" {
+		log.Info("metricinfo...", version.Metric)
+		a, b := (elapsed.Seconds()+1.0)*version.Metric.Alpha, (elapsed.Seconds()+1.0)*version.Metric.Beta
+		beta := distuv.Beta{
+			Alpha: a,
+			Beta:  b,
+		}.Rand()
+		log.Info("elapsed seconds, a, b, beta ...")
+		log.Info(elapsed.Seconds(), a, b, beta)
+		return version.Metric.Shift + beta*version.Metric.Multiplier
+	}
+	return 21.7639
+}
 
 // Param is simply a name-value pair representing name and value of HTTP query param
 type Param struct {
@@ -82,12 +120,12 @@ type Param struct {
 
 // MetricInfo provides information about the metric to be generated
 type MetricInfo struct {
-	Type       string   `yaml:"type"`
-	Rate       *float64 `yaml:"rate"`
-	Shift      *float64 `yaml:"shift"`
-	Multiplier *float64 `yaml:"multiplier"`
-	Alpha      *float64 `yaml:"alpha"`
-	Beta       *float64 `yaml:"beta"`
+	Type       string  `yaml:"type"`
+	Rate       float64 `yaml:"rate"`
+	Shift      float64 `yaml:"shift"`
+	Multiplier float64 `yaml:"multiplier"`
+	Alpha      float64 `yaml:"alpha"`
+	Beta       float64 `yaml:"beta"`
 }
 
 // VersionInfo struct provides the param and metric information for a version
@@ -104,11 +142,48 @@ type URIConf struct {
 	Provider string            `yaml:"provider"`
 }
 
+// MatchHeaders ensures that the headers in URIConf match the headers in the request
+func (u *URIConf) MatchHeaders(req *http.Request) bool {
+	for key, val := range u.Headers {
+		if req.Header.Get(key) != val {
+			return false
+		}
+	}
+	return true
+}
+
+// GetVersion finds the correct version in URIConf based on params in the request or returns nil if no matching version is found
+func (u *URIConf) GetVersion(req *http.Request) *VersionInfo {
+	for _, version := range u.Versions {
+		found := true
+		for _, param := range version.Params {
+			val, ok := req.URL.Query()[param.Name]
+			// query has this parameter
+			if ok && len(val[0]) > 0 {
+				matched, err := regexp.Match(param.Value, []byte(val[0]))
+				if err != nil || !matched { // query parameter does not match value
+					log.Warn("found no match for ... " + param.Name)
+					log.Warn(param.Value)
+					log.Warn(val[0])
+					found = false
+					break
+				} else { // query parameter matches value
+					log.Info("found match for ... " + param.Name)
+					log.Info(param.Value)
+					log.Info(val[0])
+				}
+			} else { // query doesn't have this parameter
+				found = false
+			}
+		}
+		if found { // return the first version found
+			return &version
+		}
+	}
+	return nil
+}
+
 func main() {
-
-	http.HandleFunc("/hello", hello)
-	http.HandleFunc("/headers", headers)
-
 	// find config url from env
 	configURL := os.Getenv("CONFIG_URL")
 	if len(configURL) == 0 {
@@ -133,18 +208,20 @@ func main() {
 		panic(err)
 	}
 
-	// check of URIs are unique
+	// check if URIs are unique
 	uriset := make(map[string]struct{})
 	for _, conf := range uriConfs {
 		if _, ok := uriset[conf.URI]; ok {
+			log.Error(uriset)
+			log.Error(conf.URI)
 			panic("URIs are not unique")
 		}
 		uriset[conf.URI] = struct{}{}
 	}
 
-	// for _, conf := range uriConfs {
-	// 	http.HandleFunc(conf.URI, getHandlerFunc(conf.Matcher, conf.Provider))
-	// }
+	for _, conf := range uriConfs {
+		http.HandleFunc(conf.URI, getHandlerFunc(conf))
+	}
 
-	// http.ListenAndServe(":8090", nil)
+	http.ListenAndServe(":8080", nil)
 }

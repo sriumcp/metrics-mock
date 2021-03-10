@@ -1,5 +1,5 @@
-- provider: prometheus # this URI will generate metrics in Prometheus response format
-  uri: /prom
+- provider: Prometheus # this URI will generate metrics in Prometheus response format
+  uri: /promcounter # do not use / for the uri; will lead to unexpected bad things; also make sure URIs are unique
   # every query to this URI needs to have the following headers
   headers:
     user: abcd
@@ -8,31 +8,54 @@
   versions:
   - params: # params for version 1 should match the following; 
     - name: query
-      value: something # value will be a regex matched with the `query` param value
+      # make value a literal scalar so that it can be used as a regex
+      value: "sum\\(increase\\(revision_app_request_latencies_count\\{revision_name='live-revision'\\}\\[.*\\]\\)\\) or on\\(\\) vector\\(0\\)"
     metric:
       # metric returned for this version will be interval*rate
       # interval = time elapsed in seconds since the metrics-gen pod started
       type: counter
       rate: 2    
-  - params:
+  - params: # params for version 1 should match the following; 
     - name: query
-      value: something
+      # make value a literal scalar so that it can be used as a regex
+      value: "sum\\(increase\\(revision_app_request_latencies_count\\{revision_name='dark-revision'\\}\\[.*\\]\\)\\) or on\\(\\) vector\\(0\\)"
     metric:
-      # metric returned will be interval*rate
+      # metric returned for this version will be interval*rate
+      # interval = time elapsed in seconds since the metrics-gen pod started
       type: counter
-      rate: 2.0
-- provider: prometheus
-  uri: /newrelic
-  params:
-  - name: query
-    value: something
+      rate: 5.0    
+- provider: Prometheus # this URI will generate metrics in Prometheus response format
+  uri: /promgauge # do not use / for the uri; will lead to unexpected bad things; also make sure URIs are unique
+  # every query to this URI needs to have the following headers
   headers:
     user: abcd
     pass: efgh
-  metric:
-    # metric returned will be shift + Beta(interval * alpha, interval * beta) * multiplier
-    type: gauge
-    shift: 10.0
-    multiplier: 3.0
-    alpha: 0.1
-    beta: 0.1
+  # this URI will generate metrics for the following versions
+  versions:
+  - params: # params for version 1 should match the following; 
+    - name: query
+      # make value a literal scalar so that it can be used as a regex
+      value: "accuracy{model_name='dark'\\}\\[.*\\]"
+    metric:
+      # metric returned for this version will be (scaled and shifted) beta distributed
+      # interval = time elapsed in seconds since the metrics-gen pod started
+      type: gauge
+      shift: 5
+      multiplier: 10
+      alpha: .3
+      beta: .5
+# - provider: "New Relic"
+#   uri: /newrelic
+#   params:
+#   - name: query
+#     value: something
+#   headers:
+#     user: abcd
+#     pass: efgh
+#   metric:
+#     # metric returned will be shift + Beta(interval * alpha, interval * beta) * multiplier
+#     type: gauge
+#     shift: 10.0
+#     multiplier: 3.0
+#     alpha: 0.1
+#     beta: 0.1
