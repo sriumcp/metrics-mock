@@ -100,10 +100,13 @@ func getValue(version *VersionInfo) float64 {
 	}
 	if version.Metric.Type == "gauge" {
 		log.Info("metricinfo...", version.Metric)
+		a, b := (elapsed.Seconds()+1.0)*version.Metric.Alpha, (elapsed.Seconds()+1.0)*version.Metric.Beta
 		beta := distuv.Beta{
-			Alpha: (elapsed.Seconds() + 1.0) * version.Metric.Alpha,
-			Beta:  (elapsed.Seconds() + 1.0) * version.Metric.Beta,
+			Alpha: a,
+			Beta:  b,
 		}.Rand()
+		log.Info("elapsed seconds, a, b, beta ...")
+		log.Info(elapsed.Seconds(), a, b, beta)
 		return version.Metric.Shift + beta*version.Metric.Multiplier
 	}
 	return 21.7639
