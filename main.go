@@ -31,10 +31,14 @@ type HandlerFunc func(w http.ResponseWriter, req *http.Request)
 
 func getHandlerFunc(conf URIConf) HandlerFunc {
 	switch conf.Provider {
-	case "Prometheus":
+	case "prometheus":
 		return (&RequestHandler{
 			conf: conf,
 		}).PrometheusHandlerFunc
+	case "newrelic":
+		return (&RequestHandler{
+			conf: conf,
+		}).NewRelicHandlerFunc
 	default:
 		panic("unknown provider: " + conf.Provider)
 	}

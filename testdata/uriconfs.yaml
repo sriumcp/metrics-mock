@@ -1,4 +1,4 @@
-- provider: Prometheus # this URI will generate metrics in Prometheus response format
+- provider: prometheus # this URI will generate metrics in Prometheus response format
   uri: /promcounter # do not use / for the uri; will lead to unexpected bad things; also make sure URIs are unique
   # every query to this URI needs to have the following headers
   headers:
@@ -24,7 +24,7 @@
       # interval = time elapsed in seconds since the metrics-gen pod started
       type: counter
       rate: 5.0    
-- provider: Prometheus # this URI will generate metrics in Prometheus response format
+- provider: prometheus # this URI will generate metrics in Prometheus response format
   uri: /promgauge # do not use / for the uri; will lead to unexpected bad things; also make sure URIs are unique
   # every query to this URI needs to have the following headers
   headers:
@@ -35,27 +35,25 @@
   - params: # params for version 1 should match the following; 
     - name: query
       # make value a literal scalar so that it can be used as a regex
-      value: "accuracy{model_name='dark'\\}\\[.*\\]"
+      value: "accuracy\\{model_name='dark'\\}\\[.*\\]"
     metric:
       # metric returned for this version will be (scaled and shifted) beta distributed
       # interval = time elapsed in seconds since the metrics-gen pod started
       type: gauge
       shift: 5
       multiplier: 10
-      alpha: .3
-      beta: .5
-# - provider: "New Relic"
-#   uri: /newrelic
-#   params:
-#   - name: query
-#     value: something
-#   headers:
-#     user: abcd
-#     pass: efgh
-#   metric:
-#     # metric returned will be shift + Beta(interval * alpha, interval * beta) * multiplier
-#     type: gauge
-#     shift: 10.0
-#     multiplier: 3.0
-#     alpha: 0.1
-#     beta: 0.1
+      alpha: 2
+      beta: 2
+- provider: newrelic
+  uri: /newrelic
+  headers:
+    X-Query-Key: abcd
+  versions:
+  - params:
+    - name: nrql
+      value: "SELECT sum\\(istio_requests_total\\) FROM Metric where destination_service_name='dark' SINCE .* MINUTES AGO"
+    metric:
+      # metric returned for this version will be interval*rate
+      # interval = time elapsed in seconds since the metrics-gen pod started
+      type: counter
+      rate: 5.0   
