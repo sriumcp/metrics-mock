@@ -12,7 +12,7 @@ COPY newrelic.go newrelic.go
 EXPOSE 8080
 
 # ARG config_url
-ENV CONFIG_URL "https://gist.githubusercontent.com/sushmarchandran/f0b51ea57642a96dc4269ec417df45db/raw/4ecc514db28cf434102a65abc1744f5ec5c46e15/uriconfs.yaml"
+ENV CONFIG_URL "https://raw.githubusercontent.com/iter8-tools/metrics-gen/main/testdata/uriconfs.yaml"
 
 RUN go build
 CMD ["./metrics-gen"]
