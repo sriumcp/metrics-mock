@@ -1,6 +1,6 @@
 FROM golang:1.15-buster as builder
 
-WORKDIR /metrics-gen
+WORKDIR /metrics-mock
 
 # Copy the Go Modules manifests
 COPY go.mod go.mod
@@ -12,7 +12,7 @@ COPY newrelic.go newrelic.go
 EXPOSE 8080
 
 # ARG config_url
-ENV CONFIG_URL "https://raw.githubusercontent.com/iter8-tools/metrics-gen/main/testdata/uriconfs.yaml"
+ENV CONFIG_URL "https://raw.githubusercontent.com/iter8-tools/metrics-mock/main/testdata/uriconfs.yaml"
 
 RUN go build
-CMD ["./metrics-gen"]
+CMD ["./metrics-mock"]

@@ -1,4 +1,4 @@
-module github.com/iter8-tools/metrics-gen
+module github.com/iter8-tools/metrics-mock
 
 go 1.15
 
