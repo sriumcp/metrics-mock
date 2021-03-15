@@ -12,7 +12,7 @@
       value: "sum\\(increase\\(revision_app_request_latencies_count\\{revision_name='live-revision'\\}\\[.*\\]\\)\\) or on\\(\\) vector\\(0\\)"
     metric:
       # metric returned for this version will be interval*rate
-      # interval = time elapsed in seconds since the metrics-gen pod started
+      # interval = time elapsed in seconds since the metrics-mock pod started
       type: counter
       rate: 2    
   - params: # params for version 1 should match the following; 
@@ -21,7 +21,7 @@
       value: "sum\\(increase\\(revision_app_request_latencies_count\\{revision_name='dark-revision'\\}\\[.*\\]\\)\\) or on\\(\\) vector\\(0\\)"
     metric:
       # metric returned for this version will be interval*rate
-      # interval = time elapsed in seconds since the metrics-gen pod started
+      # interval = time elapsed in seconds since the metrics-mock pod started
       type: counter
       rate: 5.0    
 - provider: prometheus # this URI will generate metrics in Prometheus response format
@@ -38,7 +38,7 @@
       value: "accuracy\\{model_name='dark'\\}\\[.*\\]"
     metric:
       # metric returned for this version will be (scaled and shifted) beta distributed
-      # interval = time elapsed in seconds since the metrics-gen pod started
+      # interval = time elapsed in seconds since the metrics-mock pod started
       type: gauge
       shift: 5
       multiplier: 10
@@ -54,6 +54,6 @@
       value: "SELECT sum\\(istio_requests_total\\) FROM Metric where destination_service_name='dark' SINCE .* MINUTES AGO"
     metric:
       # metric returned for this version will be interval*rate
-      # interval = time elapsed in seconds since the metrics-gen pod started
+      # interval = time elapsed in seconds since the metrics-mock pod started
       type: counter
       rate: 5.0   
