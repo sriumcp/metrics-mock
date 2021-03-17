@@ -62,6 +62,7 @@ func (promHandler *RequestHandler) PrometheusHandlerFunc(w http.ResponseWriter, 
 			w.Write(b)
 			log.Info(version)
 		} else {
+			log.Error("cannot find any matching version in request")
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("500 - cannot find any matching version in request!"))
 		}
