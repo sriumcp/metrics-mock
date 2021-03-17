@@ -19,6 +19,7 @@ var start time.Time
 
 func init() {
 	start = time.Now()
+	log.SetLevel(log.DebugLevel)
 }
 
 // RequestHandler handles requests based on confs
@@ -124,6 +125,11 @@ func (u *URIConf) GetVersion(req *http.Request) *VersionInfo {
 					log.Info(val[0])
 				}
 			} else { // query doesn't have this parameter
+				log.Warn("query does not have parameter ", param.Name)
+				log.Warn("query params found... ")
+				log.Warn(req.URL.Query())
+				log.Warn("Raw url...")
+				log.Warn(req.URL)
 				found = false
 			}
 		}
@@ -131,6 +137,7 @@ func (u *URIConf) GetVersion(req *http.Request) *VersionInfo {
 			return &version
 		}
 	}
+	log.Error("get version is returning nil... no matching version found")
 	return nil
 }
 
